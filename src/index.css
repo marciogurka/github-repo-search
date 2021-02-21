@@ -1,0 +1,10 @@
+html,
+body * {
+  font-family: "Roboto", sans-serif;
+}
+
+body {
+  background-color: #ededed;
+  margin: 0;
+  height: 100vh;
+}
