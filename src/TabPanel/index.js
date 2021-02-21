@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   Box,
-  List,
   OutlinedInput,
   InputAdornment,
   IconButton,
@@ -12,11 +11,12 @@ import {
   ListItemText,
   ListItem,
 } from "@material-ui/core";
+import InfiniteScroll from "react-infinite-scroll-component";
 import { AlertTitle } from "@material-ui/lab";
 import { Search } from "@material-ui/icons";
 import axios from "axios";
 import RepoItem from "./RepoItem";
-import { FullWidthAlert } from "./styles";
+import { FullWidthAlert, CustomList } from "./styles";
 
 function TabPanel(props) {
   const { children, value, index, language, ...other } = props;
@@ -27,8 +27,7 @@ function TabPanel(props) {
   const [results, setResults] = useState([]);
 
   const loadData = useCallback(
-    (page, searchText) => {
-      setResults([]);
+    (page, searchText, clearResults) => {
       if (searchText) {
         setHasError(false);
         setLoading(true);
@@ -36,7 +35,7 @@ function TabPanel(props) {
         axios
           .get(url, {
             params: {
-              per_page: 100,
+              per_page: 10,
               page: page,
               sort: "stars",
               order: "desc",
@@ -44,7 +43,10 @@ function TabPanel(props) {
           })
           .then(({ data }) => {
             const { items } = data;
-            setResults(items);
+            const updatedResults = clearResults
+              ? items
+              : [...results, ...items];
+            setResults(updatedResults);
           })
           .catch((error) => {
             setHasError(true);
@@ -55,7 +57,7 @@ function TabPanel(props) {
           });
       }
     },
-    [language]
+    [language.searchKey, results]
   );
 
   function debounce(func, wait, immediate) {
@@ -75,7 +77,7 @@ function TabPanel(props) {
   }
 
   useEffect(() => {
-    loadData(page, search);
+    loadData(page, search, false);
   }, [page]);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ function TabPanel(props) {
   const handleChange = debounce((event) => {
     setHasError(false);
     setSearch(event.target.value);
-    loadData(1, event.target.value);
+    loadData(1, event.target.value, true);
   }, 300);
 
   return (
@@ -111,27 +113,13 @@ function TabPanel(props) {
               <InputAdornment position="end">
                 <IconButton
                   aria-label="do search"
-                  onClick={(ev) => loadData(1, search)}
+                  onClick={(ev) => loadData(1, search, true)}
                 >
                   <Search />
                 </IconButton>
               </InputAdornment>
             }
           />
-          {loading && !hasError && (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              width="100%"
-              my={2}
-            >
-              <Box mr={2}>
-                <CircularProgress />
-              </Box>
-              <Typography variant="body1">Loading...</Typography>
-            </Box>
-          )}
           {hasError && (
             <Box
               display="flex"
@@ -153,14 +141,22 @@ function TabPanel(props) {
               </FullWidthAlert>
             </Box>
           )}
-          {!loading && !hasError && (
-            <List>
-              {results.length > 0 &&
-                results.map((repoData) => {
-                  const { id } = repoData;
-                  return <RepoItem key={id} repo={repoData} />;
-                })}
-              {!results.length && search !== "" && (
+          {!hasError && (
+            <CustomList id="scrollableList">
+              {results.length > 0 && (
+                <InfiniteScroll
+                  dataLength={results.length}
+                  next={() => setPage(page + 1)}
+                  hasMore={true}
+                  scrollableTarget="scrollableList"
+                >
+                  {results.map((repoData) => {
+                    const { id } = repoData;
+                    return <RepoItem key={id} repo={repoData} />;
+                  })}
+                </InfiniteScroll>
+              )}
+              {!results.length && search !== "" && !loading && (
                 <ListItem>
                   <ListItemText
                     disableTypography
@@ -183,7 +179,21 @@ function TabPanel(props) {
                   />
                 </ListItem>
               )}
-            </List>
+              {loading && !hasError && (
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  width="100%"
+                  my={2}
+                >
+                  <Box mr={2}>
+                    <CircularProgress />
+                  </Box>
+                  <Typography variant="body1">Loading...</Typography>
+                </Box>
+              )}
+            </CustomList>
           )}
         </Box>
       )}
